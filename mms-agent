@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# mms-agent Stats Collecting agent for MongoDB
+#
+# chkconfig: 2345 91 19
+# description: MongoDB MMS Agent pulls stats from mongodb and.
+# Pushes them out to the webservice at mms.mongodb.com.
+# processname: python agent.py
+
+MMS_HOME="/opt/mms-agent"
+MMS_LOG_DIR="/var/log/mongo"
+MMS_LOCK_FILE="/var/lock/subsys/mms-agent"
+
+# processname: python agent.py
+# config: $MMS_HOME/config.py
+# pidfile: /var/run/mms-agent.pid
+
+# if the executables do not exist -- display error
+
+if [ ! -f $MMS_HOME/agent.py -o ! -d $MMS_HOME ]
+then
+        echo "MMS startup: cannot start, executables DNE"
+        exit 1
+fi
+
+# depending on parameter -- startup, shutdown, restart 
+# of the instance and listener or usage display 
+
+case "$1" in
+    start)
+        # MMS Agent listener and instance startup
+        echo -n "Starting MMS Daemon: "
+        python $MMS_HOME/agent.py >> $MMS_LOG_DIR/agent.log 2>&1 &
+        touch $MMS_LOCK_FILE
+        echo "OK"
+        ;;
+    stop)
+ 	# MMS Agent listener and instance shutdown
+	echo -n "Stopping MMS Daemon: "
+	ps ax | grep agent.py | grep -v grep | awk -F ' ' '{ print $1 }'| xargs kill
+        rm -f $MMS_LOCK_FILE
+        echo "OK"
+        ;;
+    status)
+	# Is MMS Agent running? Test
+	if [ `ps ax | grep agent.py | grep -v grep | wc -l` -eq 0 ]
+	then 
+	    if [ -a $MMS_LOCK_FILE ]
+	    then
+		echo "MMS lock file exists and process is dead"
+		exit 1
+	    else
+		echo "MMS Agent stopped"
+		exit 1
+	    fi
+	elif [ `ps ax | grep agent.py | grep -v grep | wc -l` -eq 1 ]
+	then
+	    if [ -a $MMS_LOCK_FILE ]
+	    then
+		echo "MMS Agent running"
+	    else
+		echo "MMS Agent running without lockfile, should be restarted"
+		exit 1
+	    fi
+	else
+	    echo "MMS Agent status unknown"
+	fi
+
+	;;
+    reload|restart)
+        $0 stop
+        $0 start
+        ;;
+    *)
+        echo "Usage: $0 start|stop|status|restart|reload"
+        exit 1
+esac
+exit 0
+
